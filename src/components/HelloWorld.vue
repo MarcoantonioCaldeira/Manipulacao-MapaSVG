@@ -25,7 +25,6 @@
 
         <button @click="Aparecer_Resumo">Salvar</button>
       </div>
-
     </div>
 
     <div class="zoom-buttons" v-if="svgContent" ref="zoomButtons">
@@ -40,7 +39,7 @@
 
   </main>
   <div  id="resumo" v-if="mostrar_resumo" ref="resumo">
-    <h2>Resumo dos lotes</h2>
+    <h2>Detalhes do lotes</h2>
 
     <div  v-if="open_resumo">
       <div v-for="resumo in resumos" :key="resumo.id && index" class="objeto_resumo" ref="objeto_resumo">
@@ -59,13 +58,14 @@
     <FooterComponent/>
   </div>
 
-
 </template>
 
 <script>
 import '@fortawesome/fontawesome-free/css/all.css';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import FooterComponent from './Footer.vue';
+import api from './api';
+
 
 export default {
   
@@ -90,7 +90,8 @@ export default {
       showLocationIcon: null,
       iconeLocation: false,
       nivel_zoon:1,
-      mostrar_button_zoom: true
+      mostrar_button_zoom: true,
+      codigoEmpreendimento: "14"
     };
   },
 
@@ -119,21 +120,38 @@ export default {
       const obj = event.target;
 
       if ((obj.tagName === 'rect' || obj.tagName === 'path' || obj.tagName === 'polygon') && obj.classList.contains('lote')) {
+        let parent = obj.parentElement;
 
-        const loteamentoId = obj.getAttribute('id');
-        console.log("Id do loteamento: ", loteamentoId)
-        this.loteamentoAtual = {
-          id: loteamentoId,
-          empreendimento: '',
-          quandra: '',
-          lote: '',
-        };
-        this.open_info  = true;
-      }else{     
-        this.open_info  = false;
+        while (parent && parent.tagName !== 'g') {
+          parent = parent.parentElement;
+        }
+
+        if (parent) {
+          const loteamentoId = parent.getAttribute('id');
+          console.log('ID do loteamento:', loteamentoId);
+
+          this.PegarDadosMapa(loteamentoId).then(imovel => {
+            console.log('Dados do imovel:', imovel);
+
+            if (imovel) {
+              this.loteamentoAtual = {
+                id: loteamentoId,
+                empreendimento: imovel.nome_usuario,
+                quadra: imovel.cod_area,
+                lote: imovel.cod_imovel,
+              };
+
+              this.open_info = true;
+            } else {
+              console.log('Loteamento não encontrado');
+            }
+          });
+        }
+      } else {
+        this.open_info = false;
       }
-
     },
+
 
     clearInput(){
       this.open_info = false
@@ -197,8 +215,40 @@ export default {
           }
         }
       }
+    },
 
+    async PegarDadosMapa(loteamentoId) {
+      try {
+        const response = await api.get(`/imoveis/${this.codigoEmpreendimento}/${loteamentoId}/0`);
+        if (response.status === 200) {
+          const loteamento = response.data;
+
+          if (loteamento) {
+            this.loteamentoAtual = {
+              id: loteamentoId,
+              empreendimento: loteamento.nome_usuario,
+              quadra: loteamento.cod_area,
+              lote: loteamento.cod_imovel,
+            };
+
+            this.open_info = true;
+            console.log('Dados do loteamento:', loteamento);
+
+          } else {
+
+            console.log('Loteamento não encontrado');
+          }
+        } else {
+
+          console.error('Erro ao buscar loteamento:', response.statusText);
+        }
+
+      } catch (error) {
+
+        console.error('Erro ao buscar loteamento:', error);
+      }
     }
+
 
 
   }
